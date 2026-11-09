@@ -1,0 +1,66 @@
+
+name: Build My Dream Life APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download project
+        uses: actions/checkout@v4
+
+      - name: Extract project archive
+        run: |
+          mkdir extracted
+          ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Project ZIP archive not found"
+            exit 1
+          fi
+          unzip -q "$ZIP_FILE" -d extracted
+
+      - name: Find Android project
+        id: locate
+        run: |
+          PROJECT_DIR=$(dirname "$(find extracted -type f \( -name settings.gradle -o -name settings.gradle.kts \) | head -n 1)")
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Gradle project not found"
+            exit 1
+          fi
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "apk_path=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build APK
+        run: gradle --no-daemon -p "${{ steps.locate.outputs.project_dir }}" :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: my-dream-life-debug-apk
+          path: ${{ steps.locate.outputs.apk_path }}
+          if-no-files-found: error
