@@ -32,6 +32,13 @@ jobs:
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
           echo "apk_path=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
 
+      - name: Fix Compose theme import
+        run: |
+          FILE="${{ steps.locate.outputs.project_dir }}/app/src/main/java/com/mydreamlife/app/MainActivity.kt"
+          if ! grep -q "import androidx.compose.foundation.isSystemInDarkTheme" "$FILE"; then
+            sed -i '/^package /a import androidx.compose.foundation.isSystemInDarkTheme' "$FILE"
+          fi
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
