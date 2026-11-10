@@ -69,8 +69,19 @@ jobs:
             fi
           done
 
+      - name: Force Java 17 compatibility
+        run: |
+          cat > "$RUNNER_TEMP/jvm17.init.gradle" <<'EOF'
+          allprojects {
+              tasks.withType(org.gradle.api.tasks.compile.JavaCompile).configureEach {
+                  sourceCompatibility = '17'
+                  targetCompatibility = '17'
+              }
+          }
+          EOF
+        
       - name: Build APK
-        run: gradle --no-daemon -p "${{ steps.locate.outputs.project_dir }}" :app:assembleDebug
+        run: gradle --no-daemon -I "$RUNNER_TEMP/jvm17.init.gradle" -p "${{ steps.locate.outputs.project_dir }}" :app:assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
