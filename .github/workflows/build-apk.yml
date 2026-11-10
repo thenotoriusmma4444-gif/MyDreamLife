@@ -21,20 +21,14 @@ jobs:
         run: |
           mkdir extracted
           ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
-          if [ -z "$ZIP_FILE" ]; then
-            echo "Project ZIP archive not found"
-            exit 1
-          fi
+          test -n "$ZIP_FILE" || exit 1
           unzip -q "$ZIP_FILE" -d extracted
 
       - name: Find Android project
         id: locate
         run: |
           PROJECT_DIR=$(dirname "$(find extracted -type f \( -name settings.gradle -o -name settings.gradle.kts \) | head -n 1)")
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "Gradle project not found"
-            exit 1
-          fi
+          test -n "$PROJECT_DIR" || exit 1
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
           echo "apk_path=$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_OUTPUT"
 
@@ -45,11 +39,18 @@ jobs:
           java-version: "17"
 
       - name: Install Android SDK packages
+        shell: bash
         run: |
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-          yes | sdkmanager --licenses || true
-          sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found"
+            exit 1
+          fi
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          yes | "$SDKMANAGER" --licenses || true
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -65,4 +66,3 @@ jobs:
           name: my-dream-life-debug-apk
           path: ${{ steps.locate.outputs.apk_path }}
           if-no-files-found: error
-
